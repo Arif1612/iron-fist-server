@@ -27,21 +27,88 @@ async function run() {
     // try ar vitorei sob api related code lekte hobe mongodb connection ar jonno
 
     /* ---------------------
-        homepage related route
+        homepage related api
         -------------------------*/
-      
-    //   all the collections 
-      
+
+    //   all the collections
+
     await client.connect();
     const classesCollection = client
       .db("iron-fist")
       .collection("popular-classes");
+    const usersCollection = client.db("iron-fist").collection("users");
+    const instructionCollection = client
+      .db("iron-fist")
+      .collection("instructors");
+    const studentCollection = client
+      .db("iron-fist")
+      .collection("student-achievements");
 
-    //   popular-classes
-    //  collection ar maddome datagula classesCollection ar vitore age thekei nia asselam r .get /classes ar maddome amra data gula amadar localhost a show krtese 
-      
-      app.get('/classes',async(req, res) => {
-        const result = await classesCollection.find().toArray();
+    const studentCartCollection = client
+      .db("iron-fist")
+      .collection("student-carts");
+
+    //  collection ar maddome datagula classesCollection ar vitore age thekei nia asselam r .get /classes ar maddome amra data gula amadar localhost a show krtese
+
+    /************
+     * users related API
+     **************** */
+
+    app.get("/users", async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const existingUser = await usersCollection.findOne(query);
+
+      if (existingUser) {
+        //console.log(existingUser);
+        return res.send({ message: "user already exists" });
+      }
+
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    /***************
+     * student-cart-collection
+     *************** */
+
+    app.post("/student-carts", async (req, res) => {
+      const item = req.body;
+      // console.log(item);
+      const result = await studentCartCollection.insertOne(item);
+      res.send(result);
+    });
+
+    app.get("/student-carts", async (req, res) => {
+      const email = req.query.email;
+      // console.log(email);
+      if (!email) {
+        res.send([]);
+      }
+      const query = { email: email };
+      const result = await studentCartCollection.find(query).toArray();
+      // console.log(result);
+      res.send(result);
+    });
+
+    /***************
+     *   popular-classes related API
+     * ********** */
+    app.get("/classes", async (req, res) => {
+      const result = await classesCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/instructors", async (req, res) => {
+      const result = await instructionCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/students", async (req, res) => {
+      const result = await studentCollection.find().toArray();
       res.send(result);
     });
 
