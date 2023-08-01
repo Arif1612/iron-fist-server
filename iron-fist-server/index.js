@@ -10,7 +10,7 @@ app.use(express.json());
 
 // connections
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@iron-fist.ryngjnb.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -77,13 +77,7 @@ async function run() {
      * student-cart-collection
      *************** */
 
-    app.post("/student-carts", async (req, res) => {
-      const item = req.body;
-      // console.log(item);
-      const result = await studentCartCollection.insertOne(item);
-      res.send(result);
-    });
-
+    // get
     app.get("/student-carts", async (req, res) => {
       const email = req.query.email;
       // console.log(email);
@@ -93,6 +87,22 @@ async function run() {
       const query = { email: email };
       const result = await studentCartCollection.find(query).toArray();
       // console.log(result);
+      res.send(result);
+    });
+
+    // post
+    app.post("/student-carts", async (req, res) => {
+      const item = req.body;
+      // console.log(item);
+      const result = await studentCartCollection.insertOne(item);
+      res.send(result);
+    });
+
+    // delete
+    app.delete("/student-carts/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await studentCartCollection.deleteOne(query);
       res.send(result);
     });
 
