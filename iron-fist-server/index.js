@@ -94,6 +94,16 @@ async function run() {
     app.post("/student-carts", async (req, res) => {
       const item = req.body;
       // console.log(item);
+
+      const query = { classId: item.classId, email: item.email };
+
+      const existingClass = await studentCartCollection.findOne(query);
+
+      if (existingClass) {
+        //console.log(existingUser);
+        return res.send({ message: "user already add this class" });
+      }
+
       const result = await studentCartCollection.insertOne(item);
       res.send(result);
     });
