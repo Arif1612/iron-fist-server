@@ -2,11 +2,33 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 require("dotenv").config();
+var jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
 
 // middleware
 app.use(cors());
 app.use(express.json());
+
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res
+      .status(401)
+      .send({ error: true, message: "unauthorized access" });
+  }
+  // bearer token
+  const token = authorization.split(" ")[1];
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
 
 // connections
 
@@ -48,6 +70,14 @@ async function run() {
       .db("iron-fist")
       .collection("student-carts");
 
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
     //  collection ar maddome datagula classesCollection ar vitore age thekei nia asselam r .get /classes ar maddome amra data gula amadar localhost a show krtese
 
     /************
@@ -73,17 +103,44 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    app.delete("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await usersCollection.deleteOne(query);
+      res.send(result);
+    });
+
     /***************
      * student-cart-collection
      *************** */
 
-    // get
-    app.get("/student-carts", async (req, res) => {
+    // get verifyJWT agula pore add krse
+    app.get("/student-carts",verifyJWT, async (req, res) => {
       const email = req.query.email;
       // console.log(email);
       if (!email) {
         res.send([]);
       }
+
+      const decodedEmail = req.query.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({error:true,message:'forbidden access'})
+      }
+
+
+      
       const query = { email: email };
       const result = await studentCartCollection.find(query).toArray();
       // console.log(result);
