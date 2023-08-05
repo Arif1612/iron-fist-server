@@ -3,6 +3,7 @@ const app = express();
 const cors = require("cors");
 require("dotenv").config();
 var jwt = require("jsonwebtoken");
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -236,18 +237,41 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/classes",verifyJWT,verifyInstructor, async (req, res) => {
+    app.post("/classes", verifyJWT, verifyInstructor, async (req, res) => {
       const newClass = req.body;
       const result = await classesCollection.insertOne(newClass);
       res.send(result);
     });
 
-    app.delete('/classes/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    app.delete("/classes/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await usersCollection.deleteOne(query);
+      const query = { _id: new ObjectId(id) };
+      const result = await classesCollection.deleteOne(query);
       res.send(result);
+    });
+
+
+    // CREATE PAYMENT INTENT
+    app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
     })
+
+
+
+
+
+
+    // payment related
 
     app.get("/instructors", async (req, res) => {
       const result = await instructionCollection.find().toArray();
