@@ -3,6 +3,7 @@ const app = express();
 const cors = require("cors");
 require("dotenv").config();
 var jwt = require("jsonwebtoken");
+
 const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
@@ -70,6 +71,7 @@ async function run() {
     const studentCartCollection = client
       .db("iron-fist")
       .collection("student-carts");
+    const paymentCollection = client.db("iron-fist").collection("payments");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -183,6 +185,7 @@ async function run() {
      *************** */
 
     // get verifyJWT agula pore add krse
+
     app.get("/student-carts", async (req, res) => {
       const email = req.query.email;
       // console.log(email);
@@ -199,6 +202,27 @@ async function run() {
 
       const query = { email: email };
       const result = await studentCartCollection.find(query).toArray();
+      // console.log(result);
+      res.send(result);
+    });
+
+    // enrolled classes specific students
+    app.get("/payments", async (req, res) => {
+      const email = req.query.email;
+      // console.log(email);
+      if (!email) {
+        res.send([]);
+      }
+
+      const decodedEmail = req.query.email;
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden access" });
+      }
+
+      const query = { email: email };
+      const result = await paymentCollection.find(query).toArray();
       // console.log(result);
       res.send(result);
     });
@@ -250,33 +274,83 @@ async function run() {
       res.send(result);
     });
 
+    // update
+    app.patch("/classes/:id/update-seats", verifyJWT, async (req, res) => {
+      const classId = req.params.id;
+      const query = { _id: new ObjectId(classId) };
+
+      // Assuming the class document has an "availableSeats" field
+      const classInfo = await classesCollection.findOne(query);
+
+      if (!classInfo) {
+        return res.status(404).send({ message: "Class not found." });
+      }
+
+      // Check if there are available seats to reduce
+      if (classInfo.availableSeats <= 0) {
+        return res
+          .status(400)
+          .send({ message: "No available seats to reduce." });
+      }
+
+      // Update the available seats and reduce by 1
+      const newAvailableSeats = classInfo.availableSeats - 1;
+
+      // Update the class document with the new available seats value
+      const updateResult = await classesCollection.updateOne(query, {
+        $set: { availableSeats: newAvailableSeats },
+      });
+
+      if (updateResult.modifiedCount !== 1) {
+        return res
+          .status(500)
+          .send({ message: "Failed to update available seats." });
+      }
+
+      res.send({
+        message: "Available seats reduced successfully.",
+        newAvailableSeats,
+      });
+    });
 
     // CREATE PAYMENT INTENT
-    app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
-        currency: 'usd',
-        payment_method_types: ['card']
+        currency: "usd",
+        payment_method_types: ["card"],
       });
 
       res.send({
-        clientSecret: paymentIntent.client_secret
-      })
-    })
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
 
+    // payment related api
+    app.post("/payments", verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const enrollClasses = payment.studentCarts;
+      console.log(enrollClasses);
+      console.log(payment);
+      const insertResult = await paymentCollection.insertOne(payment);
+      console.log(insertResult);
+      const query = {
+        _id: { $in: payment.cartItems.map((id) => new ObjectId(id)) },
+      };
+      const deleteResult = await studentCartCollection.deleteMany(query);
 
-
-
-
-
-    // payment related
+      res.send({ insertResult, deleteResult });
+    });
+    // payment related end
 
     app.get("/instructors", async (req, res) => {
       const result = await instructionCollection.find().toArray();
       res.send(result);
     });
+
     app.get("/students", async (req, res) => {
       const result = await studentCollection.find().toArray();
       res.send(result);
